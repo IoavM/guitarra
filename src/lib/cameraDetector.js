@@ -11,6 +11,16 @@ import { recordCameraValidation } from './state.js';
 let handLandmarker = null;
 let isInitializing = false;
 
+// Rutas dinámicas para soportar tanto localhost como GitHub Pages (/guitarra/)
+function getAssetUrls() {
+  const base = (import.meta.env.BASE_URL || './').replace(/\/+$/, '');
+  const localWasm = `${base}/mediapipe/wasm`;
+  const localModel = `${base}/mediapipe/hand_landmarker.task`;
+  const cdnWasm = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
+  const cdnModel = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+  return { localWasm, localModel, cdnWasm, cdnModel };
+}
+
 export async function initHandLandmarker() {
   if (handLandmarker) return handLandmarker;
   if (isInitializing) {
@@ -18,11 +28,15 @@ export async function initHandLandmarker() {
     return handLandmarker;
   }
   isInitializing = true;
+
+  const { localWasm, localModel, cdnWasm, cdnModel } = getAssetUrls();
+
+  // Intento 1: Local con GPU
   try {
-    const vision = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
+    const vision = await FilesetResolver.forVisionTasks(localWasm);
     handLandmarker = await HandLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: '/mediapipe/hand_landmarker.task',
+        modelAssetPath: localModel,
         delegate: 'GPU',
       },
       runningMode: 'VIDEO',
@@ -32,22 +46,38 @@ export async function initHandLandmarker() {
       minTrackingConfidence: 0.5,
     });
     return handLandmarker;
-  } catch (err) {
-    console.warn('Fallback a CPU para MediaPipe:', err);
+  } catch (errLocalGpu) {
+    console.warn('Fallo local GPU, intentando local CPU:', errLocalGpu);
+    // Intento 2: Local con CPU
     try {
-      const vision = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
+      const vision = await FilesetResolver.forVisionTasks(localWasm);
       handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: '/mediapipe/hand_landmarker.task',
+          modelAssetPath: localModel,
           delegate: 'CPU',
         },
         runningMode: 'VIDEO',
         numHands: 2,
       });
       return handLandmarker;
-    } catch (e2) {
-      console.error('No se pudo inicializar MediaPipe:', e2);
-      throw e2;
+    } catch (errLocalCpu) {
+      console.warn('Fallo local CPU, usando CDN de respaldo:', errLocalCpu);
+      // Intento 3: CDN de respaldo de Google
+      try {
+        const vision = await FilesetResolver.forVisionTasks(cdnWasm);
+        handLandmarker = await HandLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: cdnModel,
+            delegate: 'GPU',
+          },
+          runningMode: 'VIDEO',
+          numHands: 2,
+        });
+        return handLandmarker;
+      } catch (errCdn) {
+        console.error('Error crítico cargando HandLandmarker:', errCdn);
+        throw errCdn;
+      }
     }
   } finally {
     isInitializing = false;
@@ -247,29 +277,64 @@ export class GuitarCameraController {
   }
 
   async startCamera() {
-    await initHandLandmarker();
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        facingMode: 'user',
-      },
-      audio: false,
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('SECURE_CONTEXT_REQUIRED');
+    }
+
+    // 1. Obtener stream de la cámara (con fallback si falla la resolución ideal)
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user',
+        },
+        audio: false,
+      });
+    } catch (errConstraint) {
+      console.warn('Fallo con resolución ideal, intentando video simple:', errConstraint);
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+    }
+
+    this.stream = stream;
+    this.video.srcObject = this.stream;
+    this.video.setAttribute('playsinline', '');
+    this.video.setAttribute('muted', '');
+    this.video.muted = true;
+
+    // 2. Esperar a que el video esté listo para reproducirse
+    await new Promise((resolve) => {
+      if (this.video.readyState >= 2) {
+        resolve();
+      } else {
+        const onReady = () => {
+          this.video.removeEventListener('loadeddata', onReady);
+          this.video.removeEventListener('loadedmetadata', onReady);
+          resolve();
+        };
+        this.video.addEventListener('loadeddata', onReady);
+        this.video.addEventListener('loadedmetadata', onReady);
+        setTimeout(resolve, 2000); // Timeout de seguridad
+      }
     });
 
-    this.video.srcObject = this.stream;
-    await new Promise((resolve) => {
-      this.video.onloadedmetadata = () => {
-        this.video.play();
-        resolve();
-      };
-    });
+    try {
+      await this.video.play();
+    } catch (playErr) {
+      console.warn('Advertencia al reproducir video:', playErr);
+    }
 
     this.canvas.width = this.video.videoWidth || 1280;
     this.canvas.height = this.video.videoHeight || 720;
-
     this.isRunning = true;
     this.loop();
+
+    // 3. Inicializar MediaPipe (si aún no está listo)
+    await initHandLandmarker();
   }
 
   startSimulation() {

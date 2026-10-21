@@ -237,16 +237,56 @@ export function renderCamara(container, queryParams = {}) {
     try {
       startCamBtn.disabled = true;
       startCamBtn.innerHTML = '<span>⏳ Conectando cámara...</span>';
+      hudStatus.textContent = 'Estado: Solicitando permiso...';
       await activeController.startCamera();
       placeholder.classList.add('hidden');
       stopCamBtn.disabled = false;
       startCamBtn.innerHTML = '<span>✓ Cámara activa</span>';
       hudStatus.textContent = 'Estado: Analizando mano';
     } catch (err) {
-      console.error(err);
-      alert('No se pudo acceder a la cámara web. Puedes probar el "Modo Simulación" para ver la detección en acción.');
+      console.error('Error detallado de cámara:', err);
       startCamBtn.disabled = false;
       startCamBtn.innerHTML = '<span>📷 Iniciar Cámara Web</span>';
+      hudStatus.textContent = 'Estado: Error de acceso';
+
+      let userMsg = 'No se pudo acceder a la cámara web.';
+      let helpTip = 'Verifica que tu navegador tenga permiso para usar la cámara.';
+
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        userMsg = 'Permiso de cámara bloqueado por el navegador.';
+        helpTip = 'Haz clic en el ícono del candado (🔒) o de cámara en la barra de direcciones de tu navegador y activa "Permitir cámara". Luego pulsa "Reintentar".';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        userMsg = 'No se detectó ninguna cámara web conectada.';
+        helpTip = 'Conecta tu cámara o prueba el "Modo Simulación" para practicar sin cámara.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        userMsg = 'La cámara ya está siendo usada por otra aplicación.';
+        helpTip = 'Cierra Zoom, Google Meet, Teams u otras pestañas que puedan estar usando tu cámara.';
+      } else if (err.message === 'SECURE_CONTEXT_REQUIRED') {
+        userMsg = 'Se requiere conexión segura (HTTPS o localhost).';
+        helpTip = 'Para usar la cámara, ingresa mediante https://ioavm.github.io/guitarra/ o desde localhost.';
+      } else if (err.message) {
+        userMsg = `Error: ${err.message}`;
+      }
+
+      placeholder.innerHTML = `
+        <div class="cp-ico" style="filter: drop-shadow(0 6px 20px hsla(355, 86%, 63%, 0.6));">📷</div>
+        <h3 style="color: var(--danger); margin-bottom: 8px;">${userMsg}</h3>
+        <p class="muted" style="margin-bottom: 16px; font-size: 0.92rem; line-height: 1.4;">${helpTip}</p>
+        <div class="row" style="justify-content: center; gap: 10px;">
+          <button class="btn primary sm" id="retry-cam-btn">🔄 Reintentar conexión</button>
+          <button class="btn ghost sm" id="trigger-sim-fallback">🧪 Usar Modo Simulación</button>
+        </div>
+      `;
+
+      placeholder.classList.remove('hidden');
+
+      placeholder.querySelector('#retry-cam-btn')?.addEventListener('click', () => {
+        startCamBtn.click();
+      });
+
+      placeholder.querySelector('#trigger-sim-fallback')?.addEventListener('click', () => {
+        startSimBtn.click();
+      });
     }
   });
 
