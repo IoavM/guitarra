@@ -19,12 +19,15 @@ let chorusLfoNode = null;
 let chorusGainNode = null;
 let guitarOutGain = null;
 
+const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+
 export const GUITAR_PRESETS = [
   {
     id: 'acoustic-steel',
     name: 'Acústica Folk (Cuerdas de Acero)',
     shortName: 'Acústica Folk',
     category: 'acústica',
+    image: `${assetBase}/img/guitars/acoustic-steel.jpg`,
     icon: '🎸',
     badge: 'Dreadnought Steel',
     color: '#ff9f43',
@@ -46,6 +49,7 @@ export const GUITAR_PRESETS = [
     name: 'Española / Clásica (Cuerdas de Nylon)',
     shortName: 'Clásica Nylon',
     category: 'acústica',
+    image: `${assetBase}/img/guitars/classical-nylon.jpg`,
     icon: '🪕',
     badge: 'Spanish Warm Nylon',
     color: '#e0a96d',
@@ -67,6 +71,7 @@ export const GUITAR_PRESETS = [
     name: 'Eléctrica Strat Clean (Glass & Chorus)',
     shortName: 'Strat Clean',
     category: 'eléctrica',
+    image: `${assetBase}/img/guitars/electric-clean.jpg`,
     icon: '⚡',
     badge: 'Single-Coil / Fender',
     color: '#00cfe8',
@@ -88,6 +93,7 @@ export const GUITAR_PRESETS = [
     name: 'Eléctrica Crunch / Overdrive (Tube Amp)',
     shortName: 'Rock Crunch',
     category: 'eléctrica',
+    image: `${assetBase}/img/guitars/electric-crunch.jpg`,
     icon: '🔥',
     badge: 'Les Paul / Marshall',
     color: '#ff4d4f',
@@ -109,6 +115,7 @@ export const GUITAR_PRESETS = [
     name: 'Eléctrica Heavy Distortion (High-Gain Lead)',
     shortName: 'Heavy Metal',
     category: 'eléctrica',
+    image: `${assetBase}/img/guitars/electric-distortion.jpg`,
     icon: '🤘',
     badge: 'High-Gain 4x12',
     color: '#a855f7',

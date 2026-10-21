@@ -118,10 +118,14 @@ export const SONGS = [
     strumCounts: ['1', '&', '2', '&', '3', '&', '4', '&'],
     strumDesc: 'Patrón con chasquidos / muting rítmico enérgico (Bm - G - D - A).',
     bars: [
-      { chord: 'Bm', beats: 4, section: 'Intro / Riff' },
-      { chord: 'G', beats: 4 },
-      { chord: 'D', beats: 4 },
-      { chord: 'A', beats: 4 },
+      { chord: 'Bm', beats: 2, section: 'Riff principal (Ciclo de 2 compases)' },
+      { chord: 'G', beats: 2 },
+      { chord: 'D', beats: 2 },
+      { chord: 'A', beats: 2 },
+      { chord: 'Bm', beats: 2, section: 'Verso' },
+      { chord: 'G', beats: 2 },
+      { chord: 'D', beats: 2 },
+      { chord: 'A', beats: 2 },
     ],
     lyrics: [
       { section: 'Verso 1' },
@@ -133,7 +137,7 @@ export const SONGS = [
       { parts: [{ ch: 'Bm', tx: 'De a' }, { ch: 'G', tx: 'quel amor de ' }, { ch: 'D', tx: 'música li' }, { ch: 'A', tx: 'gera' }] },
       { parts: [{ ch: 'Bm', tx: 'Nada nos li' }, { ch: 'G', tx: 'bra, nada más que' }, { ch: 'D', tx: 'da' }, { ch: 'A', tx: '' }] },
     ],
-    tip: 'Si aún no dominas la cejilla de Si menor (Bm), puedes sustituirlo por Bm7 simplificado (xx0202) o D6/9 mientras ganas fuerza.'
+    tip: 'El riff de Gustavo Cerati dura 2 tiempos por acorde: Bm (2 tiempos) → G (2 tiempos) → D (2 tiempos) → A (2 tiempos). Toda la canción mantiene este ciclo exacto a 126 BPM.'
   },
   {
     id: 'la-bamba',
@@ -214,10 +218,11 @@ export const SONGS = [
     strumDesc: 'Sabor latino con golpes muteados (X). Puedes tocarla con Capo 2 usando Em - B7 - Am.',
     bars: [
       { chord: 'F#m', beats: 4, section: 'Intro / Riff' },
-      { chord: 'F#m', beats: 4 },
       { chord: 'C#7', beats: 4 },
+      { chord: 'Bm', beats: 2 },
+      { chord: 'C#7', beats: 2 },
       { chord: 'F#m', beats: 4 },
-      { chord: 'Bm', beats: 4, section: 'Verso' },
+      { chord: 'Bm', beats: 4, section: 'Coro' },
       { chord: 'F#m', beats: 4 },
       { chord: 'C#7', beats: 4 },
       { chord: 'F#m', beats: 4 },

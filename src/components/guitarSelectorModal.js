@@ -43,19 +43,24 @@ export function openGuitarSelectorModal({ onSelect = () => {} } = {}) {
                 <span class="g-radio">${isSelected ? '✓ Activa' : 'Seleccionar'}</span>
               </div>
 
-              <div class="row" style="gap: 12px; margin-bottom: 10px;">
-                <div class="g-ico" style="font-size: 2.2rem; filter: drop-shadow(0 4px 12px ${g.color}66);">
-                  ${g.icon}
+              <div class="guitar-img-wrap" style="position: relative; width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; margin-bottom: 12px; background: #000; border: 1px solid var(--border);">
+                <img src="${g.image}" alt="${g.name}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;" class="guitar-photo" />
+                <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(10,13,20,0.85); backdrop-filter: blur(8px); padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; color: ${g.color};">
+                  ${g.badge}
                 </div>
+              </div>
+
+              <div class="row" style="gap: 8px; margin-bottom: 8px; align-items: baseline;">
+                <span style="font-size: 1.3rem;">${g.icon}</span>
                 <div>
                   <h3 style="font-size: 1.15rem; margin-bottom: 2px;">${g.name}</h3>
-                  <span class="small" style="color: ${g.color}; font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em;">
+                  <span class="small" style="color: ${g.color}; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.08em;">
                     ${g.category.toUpperCase()}
                   </span>
                 </div>
               </div>
 
-              <p class="small muted" style="line-height: 1.4; margin-bottom: 16px; min-height: 38px;">
+              <p class="small muted" style="line-height: 1.4; margin-bottom: 14px; min-height: 38px;">
                 ${g.desc}
               </p>
 

@@ -1,4 +1,4 @@
-// Vista de Biblioteca de Canciones para practicar con filtros por artista y género
+// Vista de Biblioteca de Canciones para practicar con filtros por género y dificultad
 import { SONGS } from '../data/songs.js';
 import { getState } from '../lib/state.js';
 
@@ -18,12 +18,22 @@ export function renderCanciones(container) {
         if (!matchTitle && !matchArtist && !matchGenre) return false;
       }
 
-      // Filtro de categoría
-      if (activeFilter === 'juanes') {
-        return s.artist.toLowerCase().includes('juanes') || s.genre.toLowerCase().includes('latino') || s.genre.toLowerCase().includes('español');
+      // Filtro de categoría general
+      if (activeFilter === 'espanol') {
+        const esArtists = ['soda stereo', 'juanes', 'los lobos', 'ritchie valens'];
+        return esArtists.some((a) => s.artist.toLowerCase().includes(a)) ||
+               s.genre.toLowerCase().includes('español') ||
+               s.genre.toLowerCase().includes('latino') ||
+               s.genre.toLowerCase().includes('tradicional');
       }
-      if (activeFilter === 'english') {
-        return s.artist.toLowerCase().includes('jonas') || s.genre.toLowerCase().includes('folk') || s.genre.toLowerCase().includes('rock') || s.artist.toLowerCase().includes('ben e. king') || s.artist.toLowerCase().includes('oasis');
+      if (activeFilter === 'ingles') {
+        const enArtists = ['jonas brothers', 'oasis', 'the cranberries', 'bob dylan', 'guns n\' roses', 'nirvana', 'ben e. king', 'vance joy'];
+        return enArtists.some((a) => s.artist.toLowerCase().includes(a)) ||
+               s.genre.toLowerCase().includes('folk') ||
+               s.genre.toLowerCase().includes('britpop') ||
+               s.genre.toLowerCase().includes('grunge') ||
+               s.genre.toLowerCase().includes('soul') ||
+               s.genre.toLowerCase().includes('indie');
       }
       if (activeFilter === 'easy') {
         return s.level <= 2;
@@ -52,18 +62,12 @@ export function renderCanciones(container) {
     }
 
     grid.innerHTML = list.map((song) => {
-      const isJuanes = song.artist.toLowerCase().includes('juanes');
-      const isJonas = song.artist.toLowerCase().includes('jonas');
       return `
         <div class="card song-card hover" onclick="location.hash='#/cancion/${song.id}'">
           <div class="sc-top">
             <div>
-              <div class="row" style="gap: 6px; margin-bottom: 2px;">
-                <h3 style="font-size: 1.25rem;">${song.title}</h3>
-                ${isJuanes ? '<span class="chip sm" style="background: rgba(255,160,50,0.15); color: #ff9f43; border-color: rgba(255,160,50,0.3);">🇨🇴 Juanes</span>' : ''}
-                ${isJonas ? '<span class="chip sm" style="background: rgba(0,207,232,0.15); color: #00cfe8; border-color: rgba(0,207,232,0.3);">⚡ Jonas Brothers</span>' : ''}
-              </div>
-              <p class="muted small">${song.artist} · ${song.genre}</p>
+              <h3 style="font-size: 1.25rem; margin-bottom: 3px;">${song.title}</h3>
+              <p class="muted small">${song.artist} · <span style="color: var(--text-2);">${song.genre}</span></p>
             </div>
             <span class="chip primary sm">Nivel ${song.level}</span>
           </div>
@@ -98,8 +102,8 @@ export function renderCanciones(container) {
           <span class="eyebrow"><span class="ico">♫</span> Repertorio de práctica interactivo</span>
           <h1>Canciones para <span class="grad-text">aprender y tocar</span></h1>
           <p>
-            Aprende tus canciones favoritas desde cero: éxitos de <b>Juanes</b>, <b>Jonas Brothers</b>, clásicos del rock y pop.
-            Con rasgueos sincronizados en tiempo real y selector de timbres de guitarra (acústica o eléctrica).
+            Repertorio seleccionado para aprender desde cero: baladas, pop y rock en español e internacional,
+            con rasgueo sincronizado en tiempo real y selector de timbres de guitarra (acústica o eléctrica).
           </p>
         </div>
       </div>
@@ -107,19 +111,19 @@ export function renderCanciones(container) {
       <!-- BARRA DE FILTROS Y BÚSQUEDA -->
       <div class="card" style="padding: 16px 20px; margin-bottom: 24px;">
         <div class="row between" style="gap: 16px; flex-wrap: wrap;">
-          <div class="seg" id="song-filter-tabs">
+          <div class="seg" id="song-filter-tabs" style="flex-wrap: wrap;">
             <button class="active" data-filter="all">Todas (${SONGS.length})</button>
-            <button data-filter="juanes">🇨🇴 Juanes & Latino</button>
-            <button data-filter="english">🇺🇸 Jonas Brothers & Pop Inglés</button>
+            <button data-filter="espanol">🎸 Rock & Pop en español</button>
+            <button data-filter="ingles">⚡ Pop & Rock en inglés</button>
             <button data-filter="easy">⭐ Nivel 1 y 2 (Fáciles)</button>
-            <button data-filter="advanced">🔥 Nivel 3 y 4 (Cejilla/Rock)</button>
+            <button data-filter="advanced">🔥 Nivel 3 y 4 (Avanzadas)</button>
           </div>
 
           <div style="flex: 1; max-width: 320px; min-width: 200px;">
             <input
               type="search"
               id="song-search-input"
-              placeholder="🔍 Buscar canción o artista..."
+              placeholder="🔍 Buscar por título o artista..."
               style="width: 100%; padding: 8px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 0.9rem;"
             />
           </div>

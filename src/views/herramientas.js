@@ -631,14 +631,14 @@ function renderGuitarLab(root) {
                     </span>
                     <span class="g-radio">${isSel ? '✓ Activa' : 'Activar'}</span>
                   </div>
-                  <div class="row" style="gap: 10px; margin-bottom: 8px;">
-                    <span style="font-size: 2rem;">${g.icon}</span>
-                    <div>
-                      <b style="display: block; font-size: 1.05rem;">${g.name}</b>
-                      <span class="small muted">${g.badge}</span>
-                    </div>
+                  <div style="width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; margin-bottom: 10px; background: #000; border: 1px solid var(--border);">
+                    <img src="${g.image}" alt="${g.name}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;" />
                   </div>
-                  <p class="small muted" style="margin-bottom: 12px; line-height: 1.35;">${g.desc}</p>
+                  <div class="row" style="gap: 8px; margin-bottom: 6px; align-items: baseline;">
+                    <span style="font-size: 1.3rem;">${g.icon}</span>
+                    <b style="font-size: 1.05rem;">${g.name}</b>
+                  </div>
+                  <p class="small muted" style="margin-bottom: 12px; line-height: 1.35; min-height: 36px;">${g.desc}</p>
                   <button class="btn sm ${isSel ? 'primary' : 'ghost'} w-full pick-lab-btn" data-lab-guitar="${g.id}">
                     ${isSel ? '✓ Guitarra Seleccionada' : 'Seleccionar esta guitarra'}
                   </button>
