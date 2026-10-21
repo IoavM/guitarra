@@ -291,6 +291,9 @@ export function evaluateChordPlacement(landmarks, chord, fretboard, canvasW, can
     if (dist <= effTolerance) {
       status = 'ok';
       text = `✓ En Traste ${req.fret}, Cuerda ${req.string} (¡Perfecto!)`;
+    } else if (dist <= effTolerance * 1.35) {
+      status = 'near_ok';
+      text = `✓ En Traste ${req.fret}, Cuerda ${req.string}`;
     } else if (actual.fret === req.fret && actual.string !== req.string) {
       status = 'wrong_string';
       const dir = req.string > actual.string ? 'sube' : 'baja';
@@ -323,11 +326,19 @@ export function evaluateChordPlacement(landmarks, chord, fretboard, canvasW, can
     ? Math.round((totalScore / fingersNeeded.length) * 100)
     : 100;
 
+  // Tolerancia flexible ante micro-movimiento natural
+  const allFingersNear = results.length > 0 && results.every((r) =>
+    r.status === 'ok' || r.status === 'near_ok' || r.dist <= effTolerance * 1.35 || r.score >= 0.58
+  );
+
+  const isMatching = (finalScore >= 65 && allFingersNear) || (results.length > 0 && results.every((r) => r.status === 'ok' || r.status === 'near_ok'));
+
   return {
     score: finalScore,
     detectedHand: true,
     details: results,
-    isComplete: finalScore >= 75 && results.every((r) => r.status === 'ok' || r.score >= 0.7),
+    isMatching,
+    isComplete: isMatching,
   };
 }
 
@@ -374,10 +385,11 @@ export class GuitarCameraController {
     this.lastDetectionTime = 0;
     this.lastLandmarks = null;
 
-    // Validación sostenida (holding time)
-    this.successStart = null;
-    this.holdDuration = 1200; // 1.2 segundos continuos correctos
+    // Validación sostenida con acumulador continuo resiliente al movimiento
+    this.holdProgress = 0;
+    this.holdDuration = 750; // 0.75 segundos continuos
     this.hasTriggeredSuccess = false;
+    this.lastLoopTime = performance.now();
 
     // Estado de simulación (si no hay cámara)
     this.simulatedMode = false;
@@ -412,7 +424,7 @@ export class GuitarCameraController {
 
   setChord(chord) {
     this.currentChord = chord;
-    this.successStart = null;
+    this.holdProgress = 0;
     this.hasTriggeredSuccess = false;
     if (chord && chord.frets && Array.isArray(chord.frets)) {
       const positiveFrets = chord.frets.filter((f) => f > 0);
@@ -633,16 +645,32 @@ export class GuitarCameraController {
           this.onEvaluation(evalResult);
         }
 
-        // 5. Manejo del éxito sostenido
-        if (evalResult && evalResult.isComplete) {
-          if (!this.successStart) this.successStart = performance.now();
-          const elapsed = performance.now() - this.successStart;
-          const progress = Math.min(1, elapsed / this.holdDuration);
+        // 5. Manejo del éxito sostenido con acumulador continuo resiliente al movimiento
+        const nowMs = performance.now();
+        const dt = Math.min(100, Math.max(10, nowMs - (this.lastLoopTime || nowMs)));
+        this.lastLoopTime = nowMs;
 
-          // Dibujar indicador circular de retención exitosa
-          this.drawHoldRing(ctx, w, h, progress);
+        if (evalResult && evalResult.isMatching) {
+          // Si está en verde/tocando el acorde, el porcentaje sube de 0 a 100% en ~750ms
+          this.holdProgress = Math.min(1, this.holdProgress + dt / this.holdDuration);
+        } else {
+          // Si hay micro-movimiento o fluctuación de 1 frame, no se resetea a 0; decae suavemente
+          this.holdProgress = Math.max(0, this.holdProgress - (dt / 1400));
+        }
 
-          if (elapsed >= this.holdDuration && !this.hasTriggeredSuccess) {
+        // Dibujar indicador circular en pantalla si hay progreso visible
+        if (this.holdProgress > 0.04) {
+          this.drawHoldRing(ctx, w, h, this.holdProgress);
+        }
+
+        // Notificar a la interfaz con holdProgress
+        if (this.onEvaluation && evalResult) {
+          this.onEvaluation({ ...evalResult, holdProgress: this.holdProgress });
+        }
+
+        // Disparar éxito cuando el porcentaje se completa al 100%
+        if (this.holdProgress >= 0.99) {
+          if (!this.hasTriggeredSuccess) {
             this.hasTriggeredSuccess = true;
             strum(this.currentChord, { gain: 0.7 });
             recordCameraValidation(this.currentChord.id, evalResult.score);
@@ -650,8 +678,8 @@ export class GuitarCameraController {
               this.onSuccess(this.currentChord, evalResult);
             }
           }
-        } else {
-          this.successStart = null;
+        } else if (this.holdProgress <= 0.05) {
+          // Solo se rearma para volver a sonar cuando el usuario suelta el acorde
           this.hasTriggeredSuccess = false;
         }
       }
@@ -806,7 +834,8 @@ export class GuitarCameraController {
 
       // 1. Círculo objetivo en el mástil
       ctx.lineWidth = 2.5;
-      if (status === 'ok') {
+      const isGreen = status === 'ok' || status === 'near_ok';
+      if (isGreen) {
         ctx.strokeStyle = '#28c76f';
         ctx.fillStyle = 'rgba(40, 199, 111, 0.35)';
         ctx.shadowColor = '#28c76f';
@@ -834,7 +863,7 @@ export class GuitarCameraController {
       // 2. Si detectamos la yema, trazar línea guía y halo
       if (tipPos && typeof tipPos.x === 'number' && typeof tipPos.y === 'number') {
         ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = status === 'ok' ? 'rgba(40, 199, 111, 0.75)' : 'rgba(255, 77, 79, 0.75)';
+        ctx.strokeStyle = isGreen ? 'rgba(40, 199, 111, 0.75)' : 'rgba(255, 77, 79, 0.75)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(tipPos.x, tipPos.y);
@@ -843,7 +872,7 @@ export class GuitarCameraController {
         ctx.setLineDash([]);
 
         // Halo en la yema
-        ctx.fillStyle = status === 'ok' ? 'rgba(40, 199, 111, 0.6)' : 'rgba(255, 77, 79, 0.6)';
+        ctx.fillStyle = isGreen ? 'rgba(40, 199, 111, 0.6)' : 'rgba(255, 77, 79, 0.6)';
         ctx.beginPath();
         ctx.arc(tipPos.x, tipPos.y, tipRadius, 0, Math.PI * 2);
         ctx.fill();

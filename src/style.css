@@ -517,8 +517,8 @@ label.toggle input:checked + .sw::after { transform: translateX(16px); }
 .finger-feedback { display: flex; flex-direction: column; gap: 8px; }
 .ff-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); transition: all 0.25s var(--ease); }
 .ff-item .ff-dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; flex: none; background: var(--surface-3); font-family: var(--font-display); }
-.ff-item.ok { border-color: hsla(146, 64%, 50%, 0.4); background: var(--success-soft); }
-.ff-item.ok .ff-dot { background: var(--success); color: #052012; }
+.ff-item.ok, .ff-item.near_ok { border-color: hsla(146, 64%, 50%, 0.4); background: var(--success-soft); }
+.ff-item.ok .ff-dot, .ff-item.near_ok .ff-dot { background: var(--success); color: #052012; }
 .ff-item.bad { border-color: hsla(355, 86%, 63%, 0.35); background: var(--danger-soft); }
 .ff-item.bad .ff-dot { background: var(--danger); color: #250509; }
 .ff-item.wrong_string, .ff-item.wrong_fret, .ff-item.no_tip { border-color: hsla(38, 92%, 50%, 0.4); background: var(--amber-soft); }

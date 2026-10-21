@@ -234,9 +234,13 @@ export function renderCamara(container, queryParams = {}) {
       accuracyChip.textContent = `${res.score}%`;
       accuracyBar.style.width = `${res.score}%`;
 
-      if (res.score >= 75) {
+      if (res.holdProgress && res.holdProgress > 0.05) {
+        const pct = Math.round(res.holdProgress * 100);
         accuracyChip.className = 'chip success';
-        hudStatus.innerHTML = 'Estado: <b style="color: var(--success);">¡Mantén la posición!</b>';
+        hudStatus.innerHTML = `Estado: <b style="color: var(--success);">¡Sostén la posición! ${pct}%</b>`;
+      } else if (res.isMatching || res.score >= 65) {
+        accuracyChip.className = 'chip success';
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--success);">¡Acorde correcto! Sostén la mano</b>';
       } else if (res.detectedHand) {
         accuracyChip.className = 'chip warning';
         hudStatus.innerHTML = 'Estado: <b style="color: var(--warning);">Ajustando dedos</b>';
