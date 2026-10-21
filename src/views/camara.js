@@ -181,6 +181,21 @@ export function renderCamara(container, queryParams = {}) {
   activeController = new GuitarCameraController({
     videoEl,
     canvasEl,
+    onStatusChange: (status) => {
+      if (status === 'solicitando_permiso') {
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--primary);">Solicitando permiso...</b>';
+      } else if (status === 'camara_activa') {
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--teal);">Cámara activa (Cargando detector IA...)</b>';
+      } else if (status === 'ia_lista') {
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--success);">IA lista - Coloca tu mano</b>';
+      } else if (status === 'ia_fallback') {
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--amber);">Cámara en vivo (Guía visual)</b>';
+      } else if (status === 'simulacion') {
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--teal);">Simulación interactiva</b>';
+      } else if (status === 'detenido') {
+        hudStatus.innerHTML = 'Estado: <span>En espera</span>';
+      }
+    },
     onEvaluation: (res) => {
       // Actualizar score en tiempo real
       accuracyChip.textContent = `${res.score}%`;
@@ -237,41 +252,54 @@ export function renderCamara(container, queryParams = {}) {
     try {
       startCamBtn.disabled = true;
       startCamBtn.innerHTML = '<span>⏳ Conectando cámara...</span>';
-      hudStatus.textContent = 'Estado: Solicitando permiso...';
+      hudStatus.innerHTML = 'Estado: <b style="color: var(--primary);">Solicitando permiso...</b>';
+
       await activeController.startCamera();
+
       placeholder.classList.add('hidden');
       stopCamBtn.disabled = false;
       startCamBtn.innerHTML = '<span>✓ Cámara activa</span>';
-      hudStatus.textContent = 'Estado: Analizando mano';
     } catch (err) {
       console.error('Error detallado de cámara:', err);
       startCamBtn.disabled = false;
       startCamBtn.innerHTML = '<span>📷 Iniciar Cámara Web</span>';
-      hudStatus.textContent = 'Estado: Error de acceso';
 
-      let userMsg = 'No se pudo acceder a la cámara web.';
-      let helpTip = 'Verifica que tu navegador tenga permiso para usar la cámara.';
+      let userMsg = 'No se pudo acceder a la cámara web';
+      let helpSteps = `
+        <div style="text-align: left; max-width: 440px; margin: 0 auto 16px; font-size: 0.9rem; line-height: 1.5; background: var(--surface-2); padding: 14px 18px; border-radius: 12px; border: 1px solid var(--border);">
+          <b style="color: var(--text); display: block; margin-bottom: 6px;">Cómo habilitar tu cámara:</b>
+          <ol style="padding-left: 20px; margin: 0; color: var(--muted);">
+            <li>Haz clic en el <b>ícono del candado (🔒)</b> o de permisos a la izquierda de la barra de direcciones de tu navegador.</li>
+            <li>En la opción <b>Cámara</b>, selecciona <b>"Permitir"</b>.</li>
+            <li>En Windows: Comprueba que <i>Configuración &gt; Privacidad y seguridad &gt; Cámara</i> tenga activado "Permitir que las aplicaciones accedan a la cámara".</li>
+          </ol>
+        </div>
+      `;
 
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        userMsg = 'Permiso de cámara bloqueado por el navegador.';
-        helpTip = 'Haz clic en el ícono del candado (🔒) o de cámara en la barra de direcciones de tu navegador y activa "Permitir cámara". Luego pulsa "Reintentar".';
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--danger);">Permiso bloqueado</b>';
+        userMsg = 'El navegador o Windows bloquearon el permiso de cámara';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        userMsg = 'No se detectó ninguna cámara web conectada.';
-        helpTip = 'Conecta tu cámara o prueba el "Modo Simulación" para practicar sin cámara.';
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--danger);">Cámara no encontrada</b>';
+        userMsg = 'No se detectó ninguna cámara web conectada a tu equipo';
+        helpSteps = '<p class="muted" style="margin-bottom: 16px; font-size: 0.92rem;">Verifica la conexión de tu webcam USB o prueba el Modo Simulación interactivo.</p>';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        userMsg = 'La cámara ya está siendo usada por otra aplicación.';
-        helpTip = 'Cierra Zoom, Google Meet, Teams u otras pestañas que puedan estar usando tu cámara.';
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--danger);">Cámara ocupada</b>';
+        userMsg = 'Tu cámara está siendo utilizada por otra aplicación';
+        helpSteps = '<p class="muted" style="margin-bottom: 16px; font-size: 0.92rem;">Cierra aplicaciones como Zoom, Microsoft Teams, Google Meet o la app Cámara de Windows y vuelve a intentarlo.</p>';
       } else if (err.message === 'SECURE_CONTEXT_REQUIRED') {
-        userMsg = 'Se requiere conexión segura (HTTPS o localhost).';
-        helpTip = 'Para usar la cámara, ingresa mediante https://ioavm.github.io/guitarra/ o desde localhost.';
-      } else if (err.message) {
-        userMsg = `Error: ${err.message}`;
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--danger);">Conexión no segura</b>';
+        userMsg = 'Se requiere conexión segura (HTTPS o localhost)';
+        helpSteps = '<p class="muted" style="margin-bottom: 16px; font-size: 0.92rem;">Ingresa a través de https://ioavm.github.io/guitarra/ o desde localhost.</p>';
+      } else {
+        hudStatus.innerHTML = 'Estado: <b style="color: var(--danger);">Error de acceso</b>';
+        userMsg = `Error al conectar cámara: ${err.message || 'Desconocido'}`;
       }
 
       placeholder.innerHTML = `
         <div class="cp-ico" style="filter: drop-shadow(0 6px 20px hsla(355, 86%, 63%, 0.6));">📷</div>
-        <h3 style="color: var(--danger); margin-bottom: 8px;">${userMsg}</h3>
-        <p class="muted" style="margin-bottom: 16px; font-size: 0.92rem; line-height: 1.4;">${helpTip}</p>
+        <h3 style="color: var(--danger); margin-bottom: 10px;">${userMsg}</h3>
+        ${helpSteps}
         <div class="row" style="justify-content: center; gap: 10px;">
           <button class="btn primary sm" id="retry-cam-btn">🔄 Reintentar conexión</button>
           <button class="btn ghost sm" id="trigger-sim-fallback">🧪 Usar Modo Simulación</button>
@@ -303,12 +331,19 @@ export function renderCamara(container, queryParams = {}) {
   // Detener cámara
   stopCamBtn?.addEventListener('click', () => {
     activeController.stop();
+    placeholder.innerHTML = `
+      <div class="cp-ico">🎸</div>
+      <h3>Cámara en espera</h3>
+      <p class="muted" style="margin-top: 6px; font-size: 0.95rem;">
+        Haz clic en <b>"Iniciar Cámara Web"</b> para comenzar, o prueba el <b>"Modo Simulación"</b> para ver cómo funciona el algoritmo de análisis.
+      </p>
+    `;
     placeholder.classList.remove('hidden');
     stopCamBtn.disabled = true;
     startCamBtn.disabled = false;
     startCamBtn.innerHTML = '<span>📷 Iniciar Cámara Web</span>';
     startSimBtn.classList.replace('primary', 'ghost');
-    hudStatus.textContent = 'Estado: Detenido';
+    hudStatus.innerHTML = 'Estado: <span>En espera</span>';
   });
 
   // Escuchar acorde actual

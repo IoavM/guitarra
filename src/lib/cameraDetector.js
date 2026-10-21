@@ -13,9 +13,12 @@ let isInitializing = false;
 
 // Rutas dinámicas para soportar tanto localhost como GitHub Pages (/guitarra/)
 function getAssetUrls() {
-  const base = (import.meta.env.BASE_URL || './').replace(/\/+$/, '');
-  const localWasm = `${base}/mediapipe/wasm`;
-  const localModel = `${base}/mediapipe/hand_landmarker.task`;
+  const origin = window.location.origin;
+  const base = import.meta.env.BASE_URL || '/';
+  const resolvedBase = new URL(base, origin).pathname.replace(/\/+$/, '');
+
+  const localWasm = `${origin}${resolvedBase}/mediapipe/wasm`;
+  const localModel = `${origin}${resolvedBase}/mediapipe/hand_landmarker.task`;
   const cdnWasm = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
   const cdnModel = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
   return { localWasm, localModel, cdnWasm, cdnModel };
@@ -24,7 +27,7 @@ function getAssetUrls() {
 export async function initHandLandmarker() {
   if (handLandmarker) return handLandmarker;
   if (isInitializing) {
-    while (isInitializing) await new Promise((r) => setTimeout(r, 100));
+    while (isInitializing) await new Promise((r) => setTimeout(r, 80));
     return handLandmarker;
   }
   isInitializing = true;
@@ -45,40 +48,62 @@ export async function initHandLandmarker() {
       minHandPresenceConfidence: 0.5,
       minTrackingConfidence: 0.5,
     });
+    console.log('✓ MediaPipe HandLandmarker cargado: Local GPU');
     return handLandmarker;
   } catch (errLocalGpu) {
-    console.warn('Fallo local GPU, intentando local CPU:', errLocalGpu);
-    // Intento 2: Local con CPU
-    try {
-      const vision = await FilesetResolver.forVisionTasks(localWasm);
-      handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: localModel,
-          delegate: 'CPU',
-        },
-        runningMode: 'VIDEO',
-        numHands: 2,
-      });
-      return handLandmarker;
-    } catch (errLocalCpu) {
-      console.warn('Fallo local CPU, usando CDN de respaldo:', errLocalCpu);
-      // Intento 3: CDN de respaldo de Google
-      try {
-        const vision = await FilesetResolver.forVisionTasks(cdnWasm);
-        handLandmarker = await HandLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: cdnModel,
-            delegate: 'GPU',
-          },
-          runningMode: 'VIDEO',
-          numHands: 2,
-        });
-        return handLandmarker;
-      } catch (errCdn) {
-        console.error('Error crítico cargando HandLandmarker:', errCdn);
-        throw errCdn;
-      }
-    }
+    console.warn('Fallo local GPU, probando local CPU...', errLocalGpu);
+  }
+
+  // Intento 2: Local con CPU
+  try {
+    const vision = await FilesetResolver.forVisionTasks(localWasm);
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: localModel,
+        delegate: 'CPU',
+      },
+      runningMode: 'VIDEO',
+      numHands: 2,
+    });
+    console.log('✓ MediaPipe HandLandmarker cargado: Local CPU');
+    return handLandmarker;
+  } catch (errLocalCpu) {
+    console.warn('Fallo local CPU, probando CDN GPU de Google...', errLocalCpu);
+  }
+
+  // Intento 3: CDN con GPU
+  try {
+    const vision = await FilesetResolver.forVisionTasks(cdnWasm);
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: cdnModel,
+        delegate: 'GPU',
+      },
+      runningMode: 'VIDEO',
+      numHands: 2,
+    });
+    console.log('✓ MediaPipe HandLandmarker cargado: CDN GPU');
+    return handLandmarker;
+  } catch (errCdnGpu) {
+    console.warn('Fallo CDN GPU, probando CDN CPU...', errCdnGpu);
+  }
+
+  // Intento 4: CDN con CPU
+  try {
+    const vision = await FilesetResolver.forVisionTasks(cdnWasm);
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: cdnModel,
+        delegate: 'CPU',
+      },
+      runningMode: 'VIDEO',
+      numHands: 2,
+    });
+    console.log('✓ MediaPipe HandLandmarker cargado: CDN CPU');
+    return handLandmarker;
+  } catch (errCdnCpu) {
+    console.error('No se pudo inicializar MediaPipe (se usará modo visual guiado):', errCdnCpu);
+    return null;
   } finally {
     isInitializing = false;
   }
@@ -247,18 +272,25 @@ export class GuitarCameraController {
     canvasEl,
     onEvaluation = () => {},
     onSuccess = () => {},
+    onStatusChange = () => {},
   }) {
     this.video = videoEl;
     this.canvas = canvasEl;
     this.ctx = canvasEl.getContext('2d');
     this.onEvaluation = onEvaluation;
     this.onSuccess = onSuccess;
+    this.onStatusChange = onStatusChange;
 
     this.fretboard = new VirtualFretboard();
     this.currentChord = null;
     this.stream = null;
     this.animId = null;
     this.isRunning = false;
+
+    // Control de tiempo para detección fluida
+    this.lastVideoTime = -1;
+    this.lastDetectionTime = 0;
+    this.lastLandmarks = null;
 
     // Validación sostenida (holding time)
     this.successStart = null;
@@ -280,6 +312,8 @@ export class GuitarCameraController {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error('SECURE_CONTEXT_REQUIRED');
     }
+
+    this.onStatusChange('solicitando_permiso');
 
     // 1. Obtener stream de la cámara (con fallback si falla la resolución ideal)
     let stream;
@@ -318,7 +352,7 @@ export class GuitarCameraController {
         };
         this.video.addEventListener('loadeddata', onReady);
         this.video.addEventListener('loadedmetadata', onReady);
-        setTimeout(resolve, 2000); // Timeout de seguridad
+        setTimeout(resolve, 2500); // Timeout de seguridad
       }
     });
 
@@ -331,10 +365,30 @@ export class GuitarCameraController {
     this.canvas.width = this.video.videoWidth || 1280;
     this.canvas.height = this.video.videoHeight || 720;
     this.isRunning = true;
+    this.simulatedMode = false;
+    this.lastVideoTime = -1;
+    this.lastDetectionTime = 0;
+    this.lastLandmarks = null;
     this.loop();
 
-    // 3. Inicializar MediaPipe (si aún no está listo)
-    await initHandLandmarker();
+    this.onStatusChange('camara_activa');
+
+    // 3. Inicializar MediaPipe en segundo plano sin bloquear el video en vivo
+    initHandLandmarker()
+      .then((landmarker) => {
+        if (!this.isRunning) return;
+        if (landmarker) {
+          this.onStatusChange('ia_lista');
+        } else {
+          this.onStatusChange('ia_fallback');
+        }
+      })
+      .catch((err) => {
+        console.warn('MediaPipe error en inicialización de fondo:', err);
+        if (this.isRunning) {
+          this.onStatusChange('ia_fallback');
+        }
+      });
   }
 
   startSimulation() {
@@ -342,55 +396,84 @@ export class GuitarCameraController {
     this.canvas.width = 1280;
     this.canvas.height = 720;
     this.isRunning = true;
+    this.lastLandmarks = null;
+    this.onStatusChange('simulacion');
     this.loop();
   }
 
   stop() {
     this.isRunning = false;
-    if (this.animId) cancelAnimationFrame(this.animId);
+    if (this.animId) {
+      cancelAnimationFrame(this.animId);
+      this.animId = null;
+    }
     if (this.stream) {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;
     }
+    if (this.video) {
+      this.video.pause();
+      this.video.srcObject = null;
+    }
+    if (this.ctx) {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+    this.lastLandmarks = null;
+    this.lastVideoTime = -1;
+    this.onStatusChange('detenido');
   }
 
   loop() {
     if (!this.isRunning) return;
 
+    // Asegurar que el siguiente frame siempre se ejecute
+    this.animId = requestAnimationFrame(() => this.loop());
+
     const w = this.canvas.width;
     const h = this.canvas.height;
     const ctx = this.ctx;
 
-    // 1. Dibujar imagen de fondo (video o gradiente simulado)
-    if (!this.simulatedMode && this.video.readyState >= 2) {
-      ctx.save();
-      // Efecto espejo horizontal para que actúe como un espejo natural
-      ctx.translate(w, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(this.video, 0, 0, w, h);
-      ctx.restore();
-    } else {
+    // Limpiar canvas para que actúe como overlay transparente sobre el video nativo
+    ctx.clearRect(0, 0, w, h);
+
+    if (this.simulatedMode) {
       // Modo simulación: fondo de estudio oscuro con textura
       ctx.fillStyle = '#0a0d14';
       ctx.fillRect(0, 0, w, h);
       const grad = ctx.createRadialGradient(w / 2, h / 2, 80, w / 2, h / 2, w * 0.7);
       grad.addColorStop(0, 'rgba(255, 120, 50, 0.08)');
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
     }
 
     // 2. Obtener landmarks
     let landmarks = null;
-    if (!this.simulatedMode && handLandmarker && this.video.readyState >= 2) {
-      const results = handLandmarker.detectForVideo(this.video, performance.now());
-      if (results.landmarks && results.landmarks.length > 0) {
-        // En espejo, invertimos X de los landmarks para que coincida con el dibujo reflejado
-        landmarks = results.landmarks[0].map((lm) => ({
-          x: 1 - lm.x,
-          y: lm.y,
-          z: lm.z,
-        }));
+    if (!this.simulatedMode && handLandmarker && this.video && this.video.readyState >= 2) {
+      const now = performance.now();
+      // MediaPipe exige timestamps crecientes y nuevo frame
+      if (this.video.currentTime !== this.lastVideoTime && now > this.lastDetectionTime) {
+        this.lastVideoTime = this.video.currentTime;
+        this.lastDetectionTime = now;
+        try {
+          const results = handLandmarker.detectForVideo(this.video, now);
+          if (results && results.landmarks && results.landmarks.length > 0) {
+            // En espejo, invertimos X de los landmarks para que coincida con el video CSS transform: scaleX(-1)
+            landmarks = results.landmarks[0].map((lm) => ({
+              x: 1 - lm.x,
+              y: lm.y,
+              z: lm.z,
+            }));
+            this.lastLandmarks = landmarks;
+          } else {
+            this.lastLandmarks = null;
+          }
+        } catch (detErr) {
+          console.warn('Frame de detección omitido:', detErr);
+          landmarks = this.lastLandmarks;
+        }
+      } else {
+        landmarks = this.lastLandmarks;
       }
     } else if (this.simulatedMode && this.currentChord) {
       // Mano simulada que se mueve suavemente hacia las notas del acorde
@@ -436,8 +519,6 @@ export class GuitarCameraController {
     if (landmarks) {
       this.drawHandLandmarks(ctx, landmarks, w, h);
     }
-
-    this.animId = requestAnimationFrame(() => this.loop());
   }
 
   // Generador de mano simulada para pruebas
