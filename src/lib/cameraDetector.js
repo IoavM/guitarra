@@ -115,12 +115,36 @@ export async function initHandLandmarker() {
  * Frets: 1, 2, 3, 4, 5.
  */
 export class VirtualFretboard {
-  constructor({ x = 0.18, y = 0.22, w = 0.64, h = 0.56, numFrets = 4 } = {}) {
-    this.x = x;
-    this.y = y;
+  constructor({
+    cx = 0.5,
+    cy = 0.46,
+    w = 0.34,
+    h = 0.22,
+    numFrets = 4,
+    x = null,
+    y = null,
+  } = {}) {
     this.w = w;
     this.h = h;
+    this.cx = x !== null ? x + w / 2 : cx;
+    this.cy = y !== null ? y + h / 2 : cy;
     this.numFrets = numFrets;
+  }
+
+  get x() {
+    return this.cx - this.w / 2;
+  }
+
+  set x(val) {
+    this.cx = val + this.w / 2;
+  }
+
+  get y() {
+    return this.cy - this.h / 2;
+  }
+
+  set y(val) {
+    this.cy = val + this.h / 2;
   }
 
   // Convierte cuerda (6..1) y traste (1..numFrets) a coordenadas de canvas
@@ -130,8 +154,8 @@ export class VirtualFretboard {
     const strIdx = Math.max(0, Math.min(5, 6 - (stringNum || 1))); // 0..5
     const frets = Math.max(1, this.numFrets || 4);
     const safeFret = Math.max(1, Math.min(frets, fretNum || 1));
-    const fx = (this.x ?? 0.18) + (safeFret - 0.5) * ((this.w ?? 0.64) / frets);
-    const fy = (this.y ?? 0.22) + (strIdx / 5) * (this.h ?? 0.56);
+    const fx = this.x + (safeFret - 0.5) * (this.w / frets);
+    const fy = this.y + (strIdx / 5) * this.h;
     return { x: fx * cW, y: fy * cH };
   }
 
@@ -141,17 +165,17 @@ export class VirtualFretboard {
     const h = canvasH || 720;
     const nx = px / w;
     const ny = py / h;
-    const bx = this.x ?? 0.18;
-    const by = this.y ?? 0.22;
-    const bw = this.w ?? 0.64;
-    const bh = this.h ?? 0.56;
+    const bx = this.x;
+    const by = this.y;
+    const bw = this.w;
+    const bh = this.h;
     const frets = Math.max(1, this.numFrets || 4);
 
     const inBox = nx >= bx - 0.05 && nx <= bx + bw + 0.05 &&
                  ny >= by - 0.05 && ny <= by + bh + 0.05;
 
-    const relX = (nx - bx) / bw;
-    const relY = (ny - by) / bh;
+    const relX = (nx - bx) / (bw || 0.34);
+    const relY = (ny - by) / (bh || 0.22);
 
     const fret = Math.max(1, Math.min(frets, Math.floor(relX * frets) + 1));
     const strIdx = Math.max(0, Math.min(5, Math.round(relY * 5)));
@@ -179,7 +203,7 @@ export const FINGER_PIPS = {
 /**
  * Evalúa si las puntas de los dedos coinciden con las posiciones requeridas del acorde.
  */
-export function evaluateChordPlacement(landmarks, chord, fretboard, canvasW, canvasH, { tolerancePx = 52 } = {}) {
+export function evaluateChordPlacement(landmarks, chord, fretboard, canvasW, canvasH, { tolerancePx } = {}) {
   if (!chord) {
     return { score: 0, detectedHand: false, details: [], isComplete: false };
   }
@@ -187,6 +211,11 @@ export function evaluateChordPlacement(landmarks, chord, fretboard, canvasW, can
   const fb = fretboard || new VirtualFretboard();
   const cW = canvasW || 1280;
   const cH = canvasH || 720;
+  // Distancia vertical entre cuerdas en píxeles
+  const stringSpacing = (fb.h * cH) / 5;
+  // Tolerancia ergonómica adaptada a la escala del mástil
+  const effTolerance = tolerancePx || Math.max(24, Math.min(46, Math.round(stringSpacing * 0.72)));
+
   const reqPositions = fretPositions(chord); // [{ string, fret, finger }, ...]
   const results = [];
   let totalScore = 0;
@@ -254,12 +283,12 @@ export function evaluateChordPlacement(landmarks, chord, fretboard, canvasW, can
     const actual = fb.pointToFretAndString(tipPos.x, tipPos.y, cW, cH);
 
     // Score de este dedo (1.0 = justo en el centro, decae con la distancia)
-    const fingerScore = Math.max(0, Math.min(1, 1 - dist / (tolerancePx * 2.2)));
+    const fingerScore = Math.max(0, Math.min(1, 1 - dist / (effTolerance * 2.2)));
 
     let status = 'bad';
     let text = '';
 
-    if (dist <= tolerancePx) {
+    if (dist <= effTolerance) {
       status = 'ok';
       text = `✓ En Traste ${req.fret}, Cuerda ${req.string} (¡Perfecto!)`;
     } else if (actual.fret === req.fret && actual.string !== req.string) {
@@ -320,7 +349,21 @@ export class GuitarCameraController {
     this.onSuccess = onSuccess;
     this.onStatusChange = onStatusChange;
 
-    this.fretboard = new VirtualFretboard();
+    // Cargar escala preferida del usuario (o usar la predeterminada ergonómica compacta)
+    let initW = 0.34;
+    let initH = 0.22;
+    let initCy = 0.46;
+    try {
+      const saved = localStorage.getItem('traste_fretboard_scale');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.w === 'number') initW = parsed.w;
+        if (parsed && typeof parsed.h === 'number') initH = parsed.h;
+        if (parsed && typeof parsed.cy === 'number') initCy = parsed.cy;
+      }
+    } catch (e) {}
+
+    this.fretboard = new VirtualFretboard({ w: initW, h: initH, cy: initCy });
     this.currentChord = null;
     this.stream = null;
     this.animId = null;
@@ -339,6 +382,32 @@ export class GuitarCameraController {
     // Estado de simulación (si no hay cámara)
     this.simulatedMode = false;
     this.simulatedAngle = 0;
+  }
+
+  setFretboardScale(w, h, cy = null) {
+    if (!this.fretboard) return;
+    this.fretboard.w = Math.max(0.18, Math.min(0.55, w));
+    this.fretboard.h = Math.max(0.12, Math.min(0.38, h));
+    if (cy !== null) {
+      this.fretboard.cy = Math.max(0.20, Math.min(0.80, cy));
+    }
+    try {
+      localStorage.setItem(
+        'traste_fretboard_scale',
+        JSON.stringify({ w: this.fretboard.w, h: this.fretboard.h, cy: this.fretboard.cy })
+      );
+    } catch (e) {}
+  }
+
+  moveFretboard(dCy) {
+    if (!this.fretboard) return;
+    this.fretboard.cy = Math.max(0.20, Math.min(0.80, this.fretboard.cy + dCy));
+    try {
+      localStorage.setItem(
+        'traste_fretboard_scale',
+        JSON.stringify({ w: this.fretboard.w, h: this.fretboard.h, cy: this.fretboard.cy })
+      );
+    } catch (e) {}
   }
 
   setChord(chord) {
@@ -639,23 +708,23 @@ export class GuitarCameraController {
   drawVirtualFretboard(ctx, w, h) {
     if (!ctx) return;
     const fb = this.fretboard || new VirtualFretboard();
-    const x = (fb.x ?? 0.18) * w;
-    const y = (fb.y ?? 0.22) * h;
-    const bw = (fb.w ?? 0.64) * w;
-    const bh = (fb.h ?? 0.56) * h;
+    const x = fb.x * w;
+    const y = fb.y * h;
+    const bw = fb.w * w;
+    const bh = fb.h * h;
     const numFrets = fb.numFrets || 4;
 
     ctx.save();
 
     // Fondo del diapasón (madera oscura translúcida)
-    ctx.fillStyle = 'rgba(18, 16, 22, 0.72)';
-    ctx.strokeStyle = 'rgba(255, 179, 71, 0.4)';
+    ctx.fillStyle = 'rgba(18, 16, 22, 0.78)';
+    ctx.strokeStyle = 'rgba(255, 179, 71, 0.45)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     if (typeof ctx.roundRect === 'function') {
-      ctx.roundRect(x, y - 10, bw, bh + 20, 16);
+      ctx.roundRect(x, y - 8, bw, bh + 16, 12);
     } else {
-      ctx.rect(x, y - 10, bw, bh + 20);
+      ctx.rect(x, y - 8, bw, bh + 16);
     }
     ctx.fill();
     ctx.stroke();
@@ -663,8 +732,8 @@ export class GuitarCameraController {
     // Cejuela (Nut) a la izquierda
     ctx.fillStyle = '#f5efe6';
     ctx.shadowColor = 'rgba(255, 255, 255, 0.6)';
-    ctx.shadowBlur = 8;
-    ctx.fillRect(x - 6, y - 10, 8, bh + 20);
+    ctx.shadowBlur = 6;
+    ctx.fillRect(x - 5, y - 8, 6, bh + 16);
     ctx.shadowBlur = 0;
 
     // Trastes (barritas verticales)
@@ -672,17 +741,17 @@ export class GuitarCameraController {
     for (let f = 1; f <= numFrets; f++) {
       const fx = x + f * fretW;
       ctx.strokeStyle = 'rgba(230, 230, 240, 0.35)';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.moveTo(fx, y - 8);
-      ctx.lineTo(fx, y + bh + 8);
+      ctx.moveTo(fx, y - 6);
+      ctx.lineTo(fx, y + bh + 6);
       ctx.stroke();
 
       // Número del traste abajo
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-      ctx.font = 'bold 13px Outfit, sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.font = 'bold 11px Outfit, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`Traste ${f}`, fx - fretW / 2, y + bh + 32);
+      ctx.fillText(`Traste ${f}`, fx - fretW / 2, y + bh + 20);
     }
 
     // Puntos marcadores tradicionales en traste 3, 5, 7
@@ -692,14 +761,14 @@ export class GuitarCameraController {
         const dotX = x + (df - 0.5) * fretW;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
         ctx.beginPath();
-        ctx.arc(dotX, y + bh / 2, 5.5, 0, Math.PI * 2);
+        ctx.arc(dotX, y + bh / 2, 4, 0, Math.PI * 2);
         ctx.fill();
       }
     });
 
     // Cuerdas (líneas horizontales de la 6ª arriba a la 1ª abajo)
     const stringNames = ['6 (Mi)', '5 (La)', '4 (Re)', '3 (Sol)', '2 (Si)', '1 (Mi)'];
-    const stringGauges = [4.2, 3.4, 2.8, 2.2, 1.6, 1.2];
+    const stringGauges = [3.2, 2.6, 2.1, 1.6, 1.2, 0.9];
 
     for (let s = 0; s < 6; s++) {
       const sy = y + (s / 5) * bh;
@@ -711,10 +780,10 @@ export class GuitarCameraController {
       ctx.stroke();
 
       // Nombre de la cuerda a la izquierda
-      ctx.fillStyle = 'rgba(255, 179, 71, 0.85)';
-      ctx.font = '600 12px "JetBrains Mono", monospace';
+      ctx.fillStyle = 'rgba(255, 179, 71, 0.88)';
+      ctx.font = '600 10.5px "JetBrains Mono", monospace';
       ctx.textAlign = 'right';
-      ctx.fillText(stringNames[s], x - 14, sy + 4);
+      ctx.fillText(stringNames[s], x - 8, sy + 3.5);
     }
 
     ctx.restore();
@@ -724,6 +793,11 @@ export class GuitarCameraController {
   drawChordTargetsAndFeedback(ctx, evalResult, w, h) {
     if (!ctx || !evalResult || !evalResult.details || !Array.isArray(evalResult.details)) return;
 
+    const fb = this.fretboard || new VirtualFretboard();
+    const bh = fb.h * h;
+    const targetRadius = Math.max(12, Math.min(18, Math.round(bh / 11)));
+    const tipRadius = Math.max(8, Math.min(13, Math.round(targetRadius * 0.75)));
+
     ctx.save();
 
     evalResult.details.forEach((det) => {
@@ -731,36 +805,36 @@ export class GuitarCameraController {
       if (!targetPos || typeof targetPos.x !== 'number' || typeof targetPos.y !== 'number') return;
 
       // 1. Círculo objetivo en el mástil
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       if (status === 'ok') {
         ctx.strokeStyle = '#28c76f';
-        ctx.fillStyle = 'rgba(40, 199, 111, 0.3)';
+        ctx.fillStyle = 'rgba(40, 199, 111, 0.35)';
         ctx.shadowColor = '#28c76f';
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 14;
       } else {
         ctx.strokeStyle = '#ff9f43';
-        ctx.fillStyle = 'rgba(255, 159, 67, 0.2)';
+        ctx.fillStyle = 'rgba(255, 159, 67, 0.22)';
         ctx.shadowColor = '#ff9f43';
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 10;
       }
 
       ctx.beginPath();
-      ctx.arc(targetPos.x, targetPos.y, 20, 0, Math.PI * 2);
+      ctx.arc(targetPos.x, targetPos.y, targetRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.shadowBlur = 0;
 
       // Número del dedo en el objetivo
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 15px Outfit, sans-serif';
+      ctx.font = `bold ${Math.round(targetRadius * 0.95)}px Outfit, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(`D${finger}`, targetPos.x, targetPos.y);
 
       // 2. Si detectamos la yema, trazar línea guía y halo
       if (tipPos && typeof tipPos.x === 'number' && typeof tipPos.y === 'number') {
-        ctx.setLineDash([5, 5]);
-        ctx.strokeStyle = status === 'ok' ? 'rgba(40, 199, 111, 0.7)' : 'rgba(255, 77, 79, 0.7)';
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = status === 'ok' ? 'rgba(40, 199, 111, 0.75)' : 'rgba(255, 77, 79, 0.75)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(tipPos.x, tipPos.y);
@@ -769,13 +843,13 @@ export class GuitarCameraController {
         ctx.setLineDash([]);
 
         // Halo en la yema
-        ctx.fillStyle = status === 'ok' ? 'rgba(40, 199, 111, 0.55)' : 'rgba(255, 77, 79, 0.55)';
+        ctx.fillStyle = status === 'ok' ? 'rgba(40, 199, 111, 0.6)' : 'rgba(255, 77, 79, 0.6)';
         ctx.beginPath();
-        ctx.arc(tipPos.x, tipPos.y, 14, 0, Math.PI * 2);
+        ctx.arc(tipPos.x, tipPos.y, tipRadius, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
       }
     });

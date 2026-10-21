@@ -144,16 +144,49 @@ export function renderCamara(container, queryParams = {}) {
             </p>
           </div>
 
-          <!-- CALIBRACIÓN RÁPIDA -->
+          <!-- CALIBRACIÓN DEL TAMAÑO DEL MÁSTIL -->
           <div class="card" style="padding: 18px; background: var(--surface-2);">
-            <h4 style="margin-bottom: 8px;">⚙ Calibración de distancia</h4>
-            <p class="small muted" style="margin-bottom: 12px;">
-              Si tus dedos quedan muy lejos del mástil virtual, ajusta la escala del marco:
+            <div class="row between" style="margin-bottom: 8px;">
+              <h4 style="margin: 0; font-size: 1rem;">📏 Tamaño del mástil virtual</h4>
+              <span class="chip sm" id="calib-size-chip">Normal (100%)</span>
+            </div>
+            <p class="small muted" style="margin-bottom: 12px; line-height: 1.4;">
+              Ajusta el tamaño para que tus dedos alcancen cómodamente las cuerdas y trastes según tu mano:
             </p>
-            <div class="row" style="gap: 8px;">
-              <button class="btn sm ghost" id="calib-closer-btn">🔍 Acercar marco</button>
-              <button class="btn sm ghost" id="calib-farther-btn">🔎 Alejar marco</button>
-              <button class="btn sm ghost" id="calib-reset-btn">↺ Reset</button>
+
+            <!-- PRESETS DE TAMAÑO ERGONÓMICOS -->
+            <div class="row" style="gap: 6px; margin-bottom: 10px;">
+              <button class="btn sm ghost" id="preset-size-sm" style="flex: 1; padding: 6px 8px;" title="Dedos cortos o distancia lejana">
+                🖐 Pequeño
+              </button>
+              <button class="btn sm primary" id="preset-size-md" style="flex: 1; padding: 6px 8px;" title="Tamaño ergonómico estándar">
+                ✋ Normal
+              </button>
+              <button class="btn sm ghost" id="preset-size-lg" style="flex: 1; padding: 6px 8px;" title="Manos grandes o distancia cercana">
+                🖐️ Grande
+              </button>
+            </div>
+
+            <!-- CONTROLES FINOS -->
+            <div class="row" style="gap: 6px; margin-bottom: 8px;">
+              <button class="btn sm ghost" id="calib-shrink-btn" style="flex: 1;" title="Hacer el mástil más pequeño">
+                ➖ Reducir
+              </button>
+              <button class="btn sm ghost" id="calib-expand-btn" style="flex: 1;" title="Hacer el mástil más amplio">
+                ➕ Agrandar
+              </button>
+              <button class="btn sm ghost" id="calib-reset-btn" title="Restablecer tamaño recomendado">
+                ↺ Reset
+              </button>
+            </div>
+
+            <!-- AJUSTE DE POSICIÓN VERTICAL -->
+            <div class="row between" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--muted);">
+              <span>Posición:</span>
+              <div class="row" style="gap: 6px;">
+                <button class="btn sm ghost" id="calib-up-btn" style="padding: 4px 8px;" title="Subir mástil">⬆ Subir</button>
+                <button class="btn sm ghost" id="calib-down-btn" style="padding: 4px 8px;" title="Bajar mástil">⬇ Bajar</button>
+              </div>
             </div>
           </div>
         </aside>
@@ -369,17 +402,73 @@ export function renderCamara(container, queryParams = {}) {
     });
   });
 
-  // Calibración del diapasón virtual
-  container.querySelector('#calib-closer-btn')?.addEventListener('click', () => {
-    activeController.fretboard.w = Math.min(0.85, activeController.fretboard.w + 0.05);
-    activeController.fretboard.h = Math.min(0.75, activeController.fretboard.h + 0.05);
+  // Calibración y escala ergonómica del diapasón virtual
+  const sizeChip = container.querySelector('#calib-size-chip');
+  const btnSm = container.querySelector('#preset-size-sm');
+  const btnMd = container.querySelector('#preset-size-md');
+  const btnLg = container.querySelector('#preset-size-lg');
+
+  const updateSizeUI = () => {
+    if (!sizeChip || !activeController || !activeController.fretboard) return;
+    const w = activeController.fretboard.w;
+    const pct = Math.round((w / 0.34) * 100);
+
+    let label = `${pct}%`;
+    if (w <= 0.28) label = `Pequeño (${pct}%)`;
+    else if (w >= 0.40) label = `Grande (${pct}%)`;
+    else label = `Normal (${pct}%)`;
+
+    sizeChip.textContent = label;
+
+    btnSm?.classList.toggle('primary', w <= 0.28);
+    btnSm?.classList.toggle('ghost', w > 0.28);
+
+    btnMd?.classList.toggle('primary', w > 0.28 && w < 0.40);
+    btnMd?.classList.toggle('ghost', !(w > 0.28 && w < 0.40));
+
+    btnLg?.classList.toggle('primary', w >= 0.40);
+    btnLg?.classList.toggle('ghost', w < 0.40);
+  };
+
+  updateSizeUI();
+
+  // Presets
+  btnSm?.addEventListener('click', () => {
+    activeController.setFretboardScale(0.26, 0.17);
+    updateSizeUI();
   });
-  container.querySelector('#calib-farther-btn')?.addEventListener('click', () => {
-    activeController.fretboard.w = Math.max(0.45, activeController.fretboard.w - 0.05);
-    activeController.fretboard.h = Math.max(0.35, activeController.fretboard.h - 0.05);
+  btnMd?.addEventListener('click', () => {
+    activeController.setFretboardScale(0.34, 0.22);
+    updateSizeUI();
+  });
+  btnLg?.addEventListener('click', () => {
+    activeController.setFretboardScale(0.44, 0.28);
+    updateSizeUI();
+  });
+
+  // Ajustes finos
+  container.querySelector('#calib-shrink-btn')?.addEventListener('click', () => {
+    const curW = activeController.fretboard.w;
+    const curH = activeController.fretboard.h;
+    activeController.setFretboardScale(curW * 0.9, curH * 0.9);
+    updateSizeUI();
+  });
+  container.querySelector('#calib-expand-btn')?.addEventListener('click', () => {
+    const curW = activeController.fretboard.w;
+    const curH = activeController.fretboard.h;
+    activeController.setFretboardScale(curW * 1.1, curH * 1.1);
+    updateSizeUI();
   });
   container.querySelector('#calib-reset-btn')?.addEventListener('click', () => {
-    activeController.fretboard.w = 0.64;
-    activeController.fretboard.h = 0.56;
+    activeController.setFretboardScale(0.34, 0.22, 0.46);
+    updateSizeUI();
+  });
+
+  // Posición vertical
+  container.querySelector('#calib-up-btn')?.addEventListener('click', () => {
+    activeController.moveFretboard(-0.04);
+  });
+  container.querySelector('#calib-down-btn')?.addEventListener('click', () => {
+    activeController.moveFretboard(0.04);
   });
 }
