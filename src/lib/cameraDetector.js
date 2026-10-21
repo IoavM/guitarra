@@ -5,7 +5,7 @@
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { fretPositions } from '../data/chords.js';
 import { FINGER_NAMES } from './music.js';
-import { chime, strum } from '../audio/guitar.js';
+import { strum } from '../audio/guitar.js';
 import { recordCameraValidation } from './state.js';
 
 let handLandmarker = null;
@@ -575,8 +575,7 @@ export class GuitarCameraController {
 
           if (elapsed >= this.holdDuration && !this.hasTriggeredSuccess) {
             this.hasTriggeredSuccess = true;
-            chime(true);
-            strum(this.currentChord, { gain: 0.65 });
+            strum(this.currentChord, { gain: 0.7 });
             recordCameraValidation(this.currentChord.id, evalResult.score);
             if (this.onSuccess) {
               this.onSuccess(this.currentChord, evalResult);

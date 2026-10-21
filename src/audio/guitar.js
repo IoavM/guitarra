@@ -434,7 +434,7 @@ export function click(when = 0, accent = false, gain = 0.35) {
   g.gain.exponentialRampToValueAtTime(accent ? gain * 1.4 : gain, t + 0.002);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
   o.connect(g);
-  o.connect(ctx.destination);
+  g.connect(master || ctx.destination);
   o.start(t);
   o.stop(t + 0.06);
 }
@@ -451,12 +451,12 @@ export function chime(ok = true) {
     o.frequency.value = midiToFreq(n);
     const s = t + i * 0.08;
     g.gain.setValueAtTime(0.0001, s);
-    g.gain.exponentialRampToValueAtTime(ok ? 0.18 : 0.06, s + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, s + (ok ? 0.5 : 0.25));
+    g.gain.exponentialRampToValueAtTime(ok ? 0.12 : 0.06, s + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, s + (ok ? 0.45 : 0.25));
     o.connect(g);
-    o.connect(ctx.destination);
+    g.connect(master || ctx.destination);
     o.start(s);
-    o.stop(s + 0.6);
+    o.stop(s + 0.5);
   });
 }
 
