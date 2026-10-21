@@ -521,6 +521,9 @@ label.toggle input:checked + .sw::after { transform: translateX(16px); }
 .ff-item.ok .ff-dot { background: var(--success); color: #052012; }
 .ff-item.bad { border-color: hsla(355, 86%, 63%, 0.35); background: var(--danger-soft); }
 .ff-item.bad .ff-dot { background: var(--danger); color: #250509; }
+.ff-item.wrong_string, .ff-item.wrong_fret, .ff-item.no_tip { border-color: hsla(38, 92%, 50%, 0.4); background: var(--amber-soft); }
+.ff-item.wrong_string .ff-dot, .ff-item.wrong_fret .ff-dot, .ff-item.no_tip .ff-dot { background: var(--amber); color: #231502; }
+.ff-item.no_hand { opacity: 0.75; }
 .ff-item .ff-txt { font-size: 0.88rem; line-height: 1.35; }
 .ff-item .ff-txt b { display: block; font-size: 0.92rem; }
 

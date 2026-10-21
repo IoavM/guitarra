@@ -258,6 +258,7 @@ export function renderCamara(container, queryParams = {}) {
 
       placeholder.classList.add('hidden');
       stopCamBtn.disabled = false;
+      startCamBtn.disabled = true;
       startCamBtn.innerHTML = '<span>✓ Cámara activa</span>';
     } catch (err) {
       console.error('Error detallado de cámara:', err);
