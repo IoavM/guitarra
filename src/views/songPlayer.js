@@ -3,7 +3,8 @@
 import { getSong } from '../data/songs.js';
 import { getChord } from '../data/chords.js';
 import { renderChordSvg, bindChordDiagram } from '../components/chordDiagram.js';
-import { Transport, strum, click } from '../audio/guitar.js';
+import { Transport, strum, click, GUITAR_PRESETS, getGuitarPreset, setGuitarPreset, onGuitarChange } from '../audio/guitar.js';
+import { setSelectedGuitar } from '../lib/state.js';
 
 let activeTransport = null;
 
@@ -29,6 +30,7 @@ export function renderSongPlayer(container, songId) {
   let currentBarIdx = 0;
   let playAudioChords = true;
   let playMetronome = true;
+  let currentGuitar = getGuitarPreset();
 
   container.innerHTML = `
     <div class="view-enter">
@@ -45,6 +47,25 @@ export function renderSongPlayer(container, songId) {
             <a href="#/camara?chord=${song.chords[0]}" class="btn sm primary">
               ◉ Practicar acordes con IA
             </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- SELECTOR DE TIMBRE DE GUITARRA -->
+      <div class="card" style="padding: 12px 18px; margin-bottom: 22px; background: var(--surface-2);">
+        <div class="row between" style="gap: 12px; flex-wrap: wrap;">
+          <div class="row" style="gap: 8px;">
+            <b class="small" style="text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);">
+              Timbre de guitarra:
+            </b>
+            <span class="chip primary sm" id="song-guitar-badge">${currentGuitar.badge}</span>
+          </div>
+          <div class="seg" id="song-guitar-pills">
+            ${GUITAR_PRESETS.map((g) => `
+              <button class="${g.id === currentGuitar.id ? 'active' : ''}" data-id="${g.id}" title="${g.desc}">
+                <span>${g.icon}</span> <span>${g.shortName}</span>
+              </button>
+            `).join('')}
           </div>
         </div>
       </div>
@@ -208,6 +229,25 @@ export function renderSongPlayer(container, songId) {
       const sym = chEl.dataset.chord;
       const c = getChord(sym);
       if (c) strum(c, { dir: 'D', gain: 0.6 });
+    });
+  });
+
+  // Manejo del selector de timbres de guitarra
+  const guitarPills = container.querySelectorAll('#song-guitar-pills button');
+  const guitarBadge = container.querySelector('#song-guitar-badge');
+
+  guitarPills.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      guitarPills.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const gId = btn.dataset.id;
+      setGuitarPreset(gId);
+      setSelectedGuitar(gId);
+      const activeG = getGuitarPreset();
+      if (guitarBadge) guitarBadge.textContent = activeG.badge;
+      // Rasgueo de prueba rápido con el acorde inicial de la canción
+      const testChord = usedChords[0] || getChord('Em');
+      strum(testChord, { dir: 'D', gain: 0.65 });
     });
   });
 

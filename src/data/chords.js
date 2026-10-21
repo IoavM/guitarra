@@ -98,6 +98,10 @@ export const EXTRA_CHORDS = [
   { id: 'F5', symbol: 'F5', name: 'Fa quinta', level: 4, frets: [1, 3, 3, -1, -1, -1], fingers: [1, 3, 4, 0, 0, 0] },
   { id: 'Ab5', symbol: 'Ab5', name: 'Lab quinta', level: 4, frets: [4, 6, 6, -1, -1, -1], fingers: [1, 3, 4, 0, 0, 0], baseFret: 4 },
   { id: 'Db5', symbol: 'Db5', name: 'Reb quinta', level: 4, frets: [-1, 4, 6, 6, -1, -1], fingers: [0, 1, 3, 4, 0, 0], baseFret: 4 },
+  { id: 'F#m', symbol: 'F#m', name: 'Fa sostenido menor', level: 4, frets: [2, 4, 4, 2, 2, 2], fingers: [1, 3, 4, 1, 1, 1], barre: { fret: 2, from: 6, to: 1 }, baseFret: 2, tip: 'Clave en La Camisa Negra de Juanes. Forma de Em con cejilla en traste 2.' },
+  { id: 'C#7', symbol: 'C#7', name: 'Do sostenido séptima', level: 3, frets: [-1, 4, 3, 4, 2, -1], fingers: [0, 3, 2, 4, 1, 0], baseFret: 2, tip: 'Tensión dominante para canciones en F#m como Juanes.' },
+  { id: 'C#m', symbol: 'C#m', name: 'Do sostenido menor', level: 4, frets: [-1, 4, 6, 6, 5, 4], fingers: [0, 1, 3, 4, 2, 1], barre: { fret: 4, from: 5, to: 1 }, baseFret: 4, tip: 'Cejilla en traste 4 con forma de Am. Clave en Sucker de Jonas Brothers.' },
+  { id: 'G#m', symbol: 'G#m', name: 'Sol sostenido menor', level: 4, frets: [4, 6, 6, 4, 4, 4], fingers: [1, 3, 4, 1, 1, 1], barre: { fret: 4, from: 6, to: 1 }, baseFret: 4, tip: 'Forma de Em con cejilla en traste 4.' },
   { id: 'Bm7', symbol: 'Bm7', name: 'Si menor 7', level: 3, frets: [-1, 2, 0, 2, 0, 2], fingers: [0, 1, 0, 2, 0, 3] },
 ];
 

@@ -1,9 +1,10 @@
 // Vista de Herramientas Esenciales: Afinador cromático con micrófono,
-// metrónomo con tap tempo, entrenador de cambio de acordes (1 minuto) y explorador del diapasón.
-import { pluck, click, audio } from '../audio/guitar.js';
+// metrónomo con tap tempo, entrenador de cambio de acordes (1 minuto), explorador del diapasón
+// y Laboratorio de Guitarras y Amplificadores (Acústica, Española, Strat Clean, Crunch, Heavy Metal).
+import { pluck, click, audio, strum, arpeggio, GUITAR_PRESETS, getGuitarPreset, setGuitarPreset } from '../audio/guitar.js';
 import { OPEN_MIDI, STRING_NAMES_EN, STRING_NAMES, midiToFreq, freqToMidi, pc, NOTES_EN, NOTES_ES } from '../lib/music.js';
 import { CHORDS, getChord } from '../data/chords.js';
-import { addXp } from '../lib/state.js';
+import { addXp, setSelectedGuitar } from '../lib/state.js';
 
 let micStream = null;
 let audioCtx = null;
@@ -26,17 +27,18 @@ export function renderHerramientas(container) {
         <div>
           <span class="eyebrow"><span class="ico">⚙</span> Caja de herramientas</span>
           <h1>Herramientas del <span class="grad-text">guitarrista</span></h1>
-          <p>Afinador con micrófono en tiempo real, metrónomo de precisión, entrenador de velocidad de cambios y mapa interactivo del diapasón.</p>
+          <p>Afinador con micrófono en tiempo real, metrónomo de precisión, entrenador de velocidad de cambios, mapa del diapasón y laboratorio de timbres de guitarra.</p>
         </div>
       </div>
 
       <!-- TABS DE HERRAMIENTAS -->
       <div class="card" style="padding: 12px 16px; margin-bottom: 24px;">
-        <div class="seg" id="tool-tabs">
+        <div class="seg" id="tool-tabs" style="flex-wrap: wrap;">
           <button class="active" data-tool="afinador">🎯 Afinador con micrófono</button>
           <button data-tool="metronomo">⏱ Metrónomo</button>
           <button data-tool="entrenador">⚡ Entrenador de cambios (1 min)</button>
           <button data-tool="diapason">🎸 Explorador del diapasón</button>
+          <button data-tool="guitarras">🎛 Laboratorio de Guitarras</button>
         </div>
       </div>
 
@@ -61,6 +63,7 @@ export function renderHerramientas(container) {
     else if (tool === 'metronomo') renderMetronome(root);
     else if (tool === 'entrenador') renderTrainer(root);
     else if (tool === 'diapason') renderFretboard(root);
+    else if (tool === 'guitarras') renderGuitarLab(root);
   }
 
   tabs.forEach((b) => {
@@ -592,4 +595,131 @@ function renderFretboard(root) {
       info.textContent = `Nota: ${nEl.dataset.es} (${nEl.dataset.en}) · Cuerda ${nEl.dataset.string} · Traste ${nEl.dataset.fret}`;
     });
   });
+}
+
+// -------------------------------------------------------------
+// 5. LABORATORIO DE GUITARRAS Y AMPLIFICADORES
+// -------------------------------------------------------------
+function renderGuitarLab(root) {
+  let activeG = getGuitarPreset();
+
+  function updateView() {
+    root.innerHTML = `
+      <div class="stack" style="gap: 24px;">
+        <div class="card" style="padding: 24px;">
+          <div class="row between" style="margin-bottom: 12px; flex-wrap: wrap;">
+            <div>
+              <h2 style="font-size: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                <span>${activeG.icon}</span> <span>${activeG.name}</span>
+              </h2>
+              <p class="muted small">${activeG.desc}</p>
+            </div>
+            <span class="chip primary lg" style="background: ${activeG.color}22; color: ${activeG.color}; border-color: ${activeG.color}55;">
+              ${activeG.badge}
+            </span>
+          </div>
+
+          <!-- SELECTOR DE GUITARRA -->
+          <div class="guitar-grid" style="margin: 20px 0;">
+            ${GUITAR_PRESETS.map((g) => {
+              const isSel = g.id === activeG.id;
+              return `
+                <div class="guitar-card ${isSel ? 'selected' : ''}" data-lab-guitar="${g.id}">
+                  <div class="row between" style="margin-bottom: 6px;">
+                    <span class="g-badge" style="background: ${g.color}22; color: ${g.color}; border: 1px solid ${g.color}44;">
+                      ${g.category}
+                    </span>
+                    <span class="g-radio">${isSel ? '✓ Activa' : 'Activar'}</span>
+                  </div>
+                  <div class="row" style="gap: 10px; margin-bottom: 8px;">
+                    <span style="font-size: 2rem;">${g.icon}</span>
+                    <div>
+                      <b style="display: block; font-size: 1.05rem;">${g.name}</b>
+                      <span class="small muted">${g.badge}</span>
+                    </div>
+                  </div>
+                  <p class="small muted" style="margin-bottom: 12px; line-height: 1.35;">${g.desc}</p>
+                  <button class="btn sm ${isSel ? 'primary' : 'ghost'} w-full pick-lab-btn" data-lab-guitar="${g.id}">
+                    ${isSel ? '✓ Guitarra Seleccionada' : 'Seleccionar esta guitarra'}
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- BANCO DE PRUEBAS DE SONIDO -->
+        <div class="grid grid-2" style="gap: 20px;">
+          <!-- PRUEBA DE ACORDES -->
+          <div class="card" style="padding: 22px;">
+            <div class="row between" style="margin-bottom: 14px;">
+              <h3>Banco de acordes de prueba</h3>
+              <span class="small muted">Escucha el timbre y resonancia</span>
+            </div>
+            <p class="small muted" style="margin-bottom: 16px;">
+              Haz clic en cualquier acorde para rasguearlo con <b>${activeG.name}</b>:
+            </p>
+            <div class="row" style="gap: 8px; flex-wrap: wrap;" id="lab-chord-buttons">
+              ${['Em', 'G', 'C', 'D', 'Am', 'F#m', 'E5', 'A5', 'C#m'].map((cId) => `
+                <button class="btn sm ghost lab-strum-chord" data-chord="${cId}" style="min-width: 60px; font-weight: 700;">
+                  ${cId} ▶
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- CUERDAS SUELTAS AL AIRE -->
+          <div class="card" style="padding: 22px;">
+            <div class="row between" style="margin-bottom: 14px;">
+              <h3>Pulsación de cuerdas al aire</h3>
+              <span class="small muted">Afinación estándar (E-A-D-G-B-E)</span>
+            </div>
+            <p class="small muted" style="margin-bottom: 16px;">
+              Toca cada cuerda para escuchar el ataque, armónicos y sustain:
+            </p>
+            <div class="row" style="gap: 8px; flex-wrap: wrap;">
+              ${OPEN_MIDI.map((m, i) => `
+                <button class="btn sm primary lab-pluck-string" data-midi="${m}" style="flex: 1; min-width: 48px; display: flex; flex-direction: column; padding: 10px 4px;">
+                  <b>${6 - i}ª</b>
+                  <span class="small" style="opacity: 0.8;">${STRING_NAMES_EN[i]}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Bindear selector de guitarra
+    root.querySelectorAll('[data-lab-guitar]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.labGuitar;
+        setGuitarPreset(id);
+        setSelectedGuitar(id);
+        activeG = getGuitarPreset();
+        updateView();
+        // Rasgueo de prueba inmediato
+        const chord = id.includes('electric') ? (getChord('E5') || getChord('Em')) : (getChord('G') || getChord('Em'));
+        strum(chord, { dir: 'D', gain: 0.65 });
+      });
+    });
+
+    // Bindear acordes
+    root.querySelectorAll('.lab-strum-chord').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const chord = getChord(btn.dataset.chord);
+        if (chord) strum(chord, { dir: 'D', gain: 0.65 });
+      });
+    });
+
+    // Bindear cuerdas
+    root.querySelectorAll('.lab-pluck-string').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const midi = parseInt(btn.dataset.midi, 10);
+        pluck(midi, 0, { gain: 0.7 });
+      });
+    });
+  }
+
+  updateView();
 }

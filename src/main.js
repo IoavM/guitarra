@@ -1,7 +1,9 @@
 // Punto de entrada principal y enrutador SPA para Traste.
 import './style.css';
 
-import { getState, subscribe, getUserLevel } from './lib/state.js';
+import { getState, subscribe, getUserLevel, getSelectedGuitar } from './lib/state.js';
+import { getGuitarPreset, setGuitarPreset, onGuitarChange } from './audio/guitar.js';
+import { openGuitarSelectorModal } from './components/guitarSelectorModal.js';
 import { renderHome } from './views/home.js';
 import { renderRuta } from './views/ruta.js';
 import { renderLesson } from './views/lesson.js';
@@ -84,11 +86,40 @@ function updateSidebarStats() {
   `;
 }
 
+// Inicialización y sincronización de Guitarra activa
+function setupGuitarWidget() {
+  const btn = document.getElementById('global-guitar-btn');
+  const iconEl = document.getElementById('global-guitar-icon');
+  const nameEl = document.getElementById('global-guitar-name');
+
+  const updateWidgetDisplay = (preset) => {
+    if (iconEl) iconEl.textContent = preset.icon;
+    if (nameEl) nameEl.textContent = preset.shortName;
+  };
+
+  // Inicializar desde localStorage
+  const savedGuitarId = getSelectedGuitar();
+  setGuitarPreset(savedGuitarId);
+  updateWidgetDisplay(getGuitarPreset());
+
+  // Escuchar cambios
+  onGuitarChange((preset) => {
+    updateWidgetDisplay(preset);
+    showToast(`Guitarra activa: ${preset.name}`, preset.icon);
+  });
+
+  // Abrir modal interactivo
+  btn?.addEventListener('click', () => {
+    openGuitarSelectorModal();
+  });
+}
+
 // Inicialización
 window.addEventListener('hashchange', handleRoute);
 window.addEventListener('DOMContentLoaded', () => {
   subscribe(updateSidebarStats);
   updateSidebarStats();
+  setupGuitarWidget();
   handleRoute();
 });
 

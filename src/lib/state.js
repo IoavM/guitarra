@@ -8,6 +8,7 @@ const DEFAULT_STATE = {
   lastActive: new Date().toISOString().slice(0, 10),
   completedLessons: ['partes-y-postura'], // primera lección desbloqueada/avanzada para dar bienvenida
   masteredChords: [],
+  selectedGuitar: 'acoustic-steel',
   favoriteSongs: ['stand-by-me'],
   quizScores: {},
   cameraStats: {
@@ -118,6 +119,16 @@ export function recordCameraValidation(chordId, accuracy) {
 export function saveCameraConfig(patch) {
   getState();
   current.cameraConfig = { ...current.cameraConfig, ...patch };
+  save();
+}
+
+export function getSelectedGuitar() {
+  return getState().selectedGuitar || 'acoustic-steel';
+}
+
+export function setSelectedGuitar(id) {
+  getState();
+  current.selectedGuitar = id;
   save();
 }
 
